@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CocoaPods → SPM Migration GUI</title>
+<style>
+  :root {
+    --bg-dark: #241200;
+    --bg-deeper: #1A0D00;
+    --gold: #DDC165;
+    --gold-light: #FFE9A3;
+    --orange: #E5591C;
+    --green: #4ADE80;
+    --yellow: #FACC15;
+    --red: #F87171;
+    --text: #E8DCC8;
+    --text-dim: #8B7D6B;
+    --border: #3D2A14;
+    --surface: #2D1A08;
+    --surface-hover: #3A2210;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+    background: var(--bg-dark);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grain */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 20% 20%, rgba(221,193,101,0.03) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(229,89,28,0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .logo-icon {
+    width: 48px;
+    height: 48px;
+    position: relative;
+  }
+
+  .logo-icon .pod {
+    width: 20px; height: 20px;
+    border: 2px solid var(--orange);
+    border-radius: 50%;
+    position: absolute;
+    top: 14px; left: 0;
+    opacity: 0.5;
+  }
+
+  .logo-icon .arrow {
+    position: absolute;
+    top: 20px; left: 18px;
+    width: 12px;
+    height: 2px;
+    background: var(--gold);
+    animation: pulse-arrow 2s ease-in-out infinite;
+  }
+
+  .logo-icon .arrow::after {
+    content: '';
+    position: absolute;
+    right: -1px; top: -3px;
+    border: 4px solid transparent;
+    border-left: 5px solid var(--gold);
+  }
+
+  .logo-icon .swift {
+    width: 20px; height: 20px;
+    border: 2px solid var(--gold);
+    border-radius: 4px;
+    position: absolute;
+    top: 14px; right: 0;
+    box-shadow: 0 0 8px rgba(221,193,101,0.3);
+  }
+
+  @keyframes pulse-arrow {
+    0%, 100% { opacity: 0.5; transform: translateX(0); }
+    50% { opacity: 1; transform: translateX(2px); }
+  }
+
+  h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--gold);
+    text-shadow: 0 0 20px rgba(221,193,101,0.2);
+    letter-spacing: -0.5px;
+  }
+
+  h1 span { color: var(--orange); }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    font-weight: 400;
+  }
+
+  /* Layout */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Panels */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .panel:focus-within {
+    border-color: var(--gold);
+    box-shadow: 0 0 20px rgba(221,193,101,0.08);
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--bg-deeper);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .panel-header .badge {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: rgba(221,193,101,0.1);
+    color: var(--gold-light);
+    font-weight: 400;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 350px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    padding: 1rem;
+    resize: vertical;
+    outline: none;
+  }
+
+  textarea::placeholder {
+    color: var(--text-dim);
+    opacity: 0.6;
+  }
+
+  /* Buttons */
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.65rem 1.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  button:hover {
+    background: var(--surface-hover);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  button.primary {
+    background: var(--orange);
+    border-color: var(--orange);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(229,89,28,0.2);
+  }
+
+  button.primary:hover {
+    background: #F06A30;
+    box-shadow: 0 0 30px rgba(229,89,28,0.35);
+    border-color: #F06A30;
+    color: #fff;
+  }
+
+  /* Results */
+  .results {
+    display: none;
+  }
+
+  .results.visible {
+    display: block;
+  }
+
+  .stats-bar {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .stat-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .stat-dot.green { background: var(--green); box-shadow: 0 0 8px rgba(74,222,128,0.4); }
+  .stat-dot.yellow { background: var(--yellow); box-shadow: 0 0 8px rgba(250,204,21,0.4); }
+  .stat-dot.red { background: var(--red); box-shadow: 0 0 8px rgba(248,113,113,0.4); }
+
+  .progress-bar {
+    height: 6px;
+    background: var(--bg-deeper);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    display: flex;
+  }
+
+  .progress-segment {
+    height: 100%;
+    transition: width 0.6s ease;
+  }
+
+  .progress-segment.green { background: var(--green); }
+  .progress-segment.yellow { background: var(--yellow); }
+  .progress-segment.red { background: var(--red); }
+
+  /* Dependency cards */
+  .dep-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .dep-card {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .dep-card:hover {
+    border-color: var(--gold);
+    background: var(--surface-hover);
+  }
+
+  .dep-card.expanded {
+    border-color: var(--gold);
+  }
+
+  .dep-status {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dep-status.available { background: var(--green); box-shadow: 0 0 8px rgba(74,222,128,0.4); }
+  .dep-status.likely { background: var(--yellow); box-shadow: 0 0 8px rgba(250,204,21,0.4); }
+  .dep-status.unavailable { background: var(--red); box-shadow: 0 0 8px rgba(248,113,113,0.4); }
+
+  .dep-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .dep-version {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+  }
+
+  .dep-tag {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .dep-tag.available { background: rgba(74,222,128,0.12); color: var(--green); }
+  .dep-tag.likely { background: rgba(250,204,21,0.12); color: var(--yellow); }
+  .dep-tag.unavailable { background: rgba(248,113,113,0.12); color: var(--red); }
+
+  .dep-details {
+    display: none;
+    grid-column: 1 / -1;
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  .dep-card.expanded .dep-details {
+    display: block;
+  }
+
+  .dep-details code {
+    background: var(--bg-deeper);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--gold-light);
+    font-size: 0.75rem;
+  }
+
+  .dep-details a {
+    color: var(--gold);
+    text-decoration: none;
+  }
+
+  .dep-details a:hover {
+    text-decoration: underline;
+  }
+
+  /* Output panel */
+  .output-panel {
+    position: relative;
+  }
+
+  .output-panel pre {
+    padding: 1rem;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    overflow-x: auto;
+    min-height: 200px;
+    color: var(--text);
+    white-space: pre;
+  }
+
+  .output-panel .copy-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    font-size: 0.7rem;
+    padding: 0.35rem 0.75rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .output-panel:hover .copy-btn {
+    opacity: 1;
+  }
+
+  /* Syntax highlighting for Package.swift */
+  .kw { color: var(--orange); }
+  .str { color: var(--green); }
+  .cm { color: var(--text-dim); }
+  .fn { color: var(--gold); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--surface);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 2rem 0;
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+
+  /* Animations */
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .results.visible .dep-card {
+    animation: fade-in 0.3s ease forwards;
+    opacity: 0;
+  }
+
+  .results.visible .dep-card:nth-child(1) { animation-delay: 0.05s; }
+  .results.visible .dep-card:nth-child(2) { animation-delay: 0.1s; }
+  .results.visible .dep-card:nth-child(3) { animation-delay: 0.15s; }
+  .results.visible .dep-card:nth-child(4) { animation-delay: 0.2s; }
+  .results.visible .dep-card:nth-child(5) { animation-delay: 0.25s; }
+  .results.visible .dep-card:nth-child(6) { animation-delay: 0.3s; }
+  .results.visible .dep-card:nth-child(7) { animation-delay: 0.35s; }
+  .results.visible .dep-card:nth-child(8) { animation-delay: 0.4s; }
+  .results.visible .dep-card:nth-child(9) { animation-delay: 0.45s; }
+  .results.visible .dep-card:nth-child(10) { animation-delay: 0.5s; }
+
+  /* Sample button */
+  .sample-btn {
+    font-size: 0.7rem;
+    padding: 0.3rem 0.6rem;
+    opacity: 0.7;
+  }
+
+  .sample-btn:hover { opacity: 1; }
+
+  /* Section headers */
+  .section-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 1rem;
+  }
+
+  /* Chevron */
+  .chevron {
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    transition: transform 0.2s;
+  }
+
+  .dep-card.expanded .chevron {
+    transform: rotate(90deg);
+  }
+
+  /* Migration notes */
+  .migration-notes {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .migration-notes h3 {
+    font-size: 0.85rem;
+    color: var(--gold);
+    margin-bottom: 0.75rem;
+  }
+
+  .migration-notes ul {
+    list-style: none;
+    font-size: 0.8rem;
+    line-height: 1.8;
+    color: var(--text-dim);
+  }
+
+  .migration-notes li::before {
+    content: '→';
+    color: var(--orange);
+    margin-right: 0.5rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">
+        <div class="pod"></div>
+        <div class="arrow"></div>
+        <div class="swift"></div>
+      </div>
+      <h1>CocoaPods <span>→</span> SPM</h1>
+    </div>
+    <div class="subtitle">Paste your Podfile. Get a migration plan and Package.swift — instantly.</div>
+  </header>
+
+  <div class="main-grid">
+    <div class="panel">
+      <div class="panel-header">
+        <span>Podfile Input</span>
+        <button class="sample-btn" onclick="loadSample()">Load Example</button>
+      </div>
+      <textarea id="podfile-input" placeholder="# Paste your Podfile here...
+platform :ios, '15.0'
+
+target 'MyApp' do
+  use_frameworks!
+
+  pod 'Alamofire', '~> 5.9'
+  pod 'SnapKit', '~> 5.7'
+  pod 'SDWebImage', '~> 5.19'
+  pod 'SwiftyJSON', '~> 5.0'
+  ...
+end" spellcheck="false"></textarea>
+    </div>
+
+    <div class="panel output-panel">
+      <div class="panel-header">
+        <span>Package.swift Output</span>
+        <span class="badge" id="swift-version-badge">Swift 5.9+</span>
+      </div>
+      <button class="copy-btn" onclick="copyOutput()">Copy</button>
+      <pre id="package-output"><span class="cm">// Paste a Podfile to generate your Package.swift</span></pre>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="primary" onclick="analyze()">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      Analyze &amp; Generate
+    </button>
+    <button onclick="clearAll()">Clear</button>
+    <button onclick="downloadPackageSwift()">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Download
+    </button>
+  </div>
+
+  <div class="results" id="results">
+    <div style="margin-top:2rem">
+      <div class="section-title">Migration Analysis</div>
+
+      <div class="stats-bar" id="stats-bar"></div>
+      <div class="progress-bar" id="progress-bar"></div>
+
+      <div class="dep-list" id="dep-list"></div>
+
+      <div class="migration-notes" id="migration-notes" style="display:none">
+        <h3>Migration Steps</h3>
+        <ul id="migration-steps"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer>
+  CocoaPods → SPM Migration GUI &middot; CocoaPods goes read-only Dec 2026 &middot; FunForrest
+</footer>
+
+<script>
+// Known CocoaPods → SPM mappings (curated database)
+const SPM_DATABASE = {
+  // Networking
+  'Alamofire':        { url: 'https://github.com/Alamofire/Alamofire.git', status: 'available', note: 'Direct SPM support since 5.0' },
+  'Moya':             { url: 'https://github.com/Moya/Moya.git', status: 'available', note: 'SPM support since 14.0' },
+  'AFNetworking':     { url: null, status: 'unavailable', note: 'No SPM support. Migrate to Alamofire or URLSession.' },
+  'Starscream':       { url: 'https://github.com/daltoniam/Starscream.git', status: 'available', note: 'SPM support available' },
+  'Socket.IO-Client-Swift': { url: 'https://github.com/socketio/socket.io-client-swift.git', status: 'available', note: 'SPM support available' },
+
+  // UI
+  'SnapKit':          { url: 'https://github.com/SnapKit/SnapKit.git', status: 'available', note: 'Full SPM support' },
+  'SDWebImage':       { url: 'https://github.com/SDWebImage/SDWebImage.git', status: 'available', note: 'SPM support since 5.10' },
+  'Kingfisher':       { url: 'https://github.com/onevcat/Kingfisher.git', status: 'available', note: 'Full SPM support' },
+  'SVProgressHUD':    { url: 'https://github.com/SVProgressHUD/SVProgressHUD.git', status: 'available', note: 'SPM support available' },
+  'MBProgressHUD':    { url: 'https://github.com/jdg/MBProgressHUD.git', status: 'likely', note: 'SPM support via Package.swift in repo' },
+  'IQKeyboardManagerSwift': { url: 'https://github.com/hackiftekhar/IQKeyboardManager.git', status: 'available', note: 'SPM support available' },
+  'IQKeyboardManager': { url: 'https://github.com/hackiftekhar/IQKeyboardManager.git', status: 'available', note: 'SPM support available (use IQKeyboardManagerSwift product)' },
+  'Hero':             { url: 'https://github.com/HeroTransitions/Hero.git', status: 'available', note: 'SPM support available' },
+  'lottie-ios':       { url: 'https://github.com/airbnb/lottie-ios.git', status: 'available', note: 'SPM support since 3.4' },
+  'Lottie':           { url: 'https://github.com/airbnb/lottie-ios.git', status: 'available', note: 'SPM support since 3.4' },
+  'Charts':           { url: 'https://github.com/ChartsOrg/Charts.git', status: 'available', note: 'SPM support available (DGCharts)' },
+  'DGCharts':         { url: 'https://github.com/ChartsOrg/Charts.git', status: 'available', note: 'Renamed from Charts. Full SPM support.' },
+  'NVActivityIndicatorView': { url: 'https://github.com/ninjaprox/NVActivityIndicatorView.git', status: 'available', note: 'SPM support available' },
+  'SkeletonView':     { url: 'https://github.com/Juanpe/SkeletonView.git', status: 'available', note: 'SPM support available' },
+  'FlexLayout':       { url: 'https://github.com/nicklama/FlexLayout.git', status: 'likely', note: 'Check repo for SPM manifest' },
+  'PinLayout':        { url: 'https://github.com/nicklama/PinLayout.git', status: 'likely', note: 'Check repo for SPM manifest' },
+  'TextFieldEffects': { url: 'https://github.com/raulriera/TextFieldEffects.git', status: 'likely', note: 'Has Package.swift in repo' },
+  'Cosmos':           { url: 'https://github.com/evgenyneu/Cosmos.git', status: 'available', note: 'SPM support available' },
+
+  // Data / Parsing
+  'SwiftyJSON':       { url: 'https://github.com/SwiftyJSON/SwiftyJSON.git', status: 'available', note: 'SPM support. Consider migrating to Codable.' },
+  'ObjectMapper':     { url: 'https://github.com/tristanhimmelman/ObjectMapper.git', status: 'available', note: 'SPM support. Consider Codable instead.' },
+  'CodableAlamofire': { url: null, status: 'unavailable', note: 'Deprecated. Use Alamofire\'s built-in Codable support.' },
+  'Mantle':           { url: null, status: 'unavailable', note: 'Obj-C only. Migrate to Codable.' },
+
+  // Storage
+  'Realm':            { url: 'https://github.com/realm/realm-swift.git', status: 'available', note: 'SPM support since 10.20. Use realm-swift package.' },
+  'RealmSwift':       { url: 'https://github.com/realm/realm-swift.git', status: 'available', note: 'SPM support since 10.20' },
+  'KeychainAccess':   { url: 'https://github.com/kishikawakatsumi/KeychainAccess.git', status: 'available', note: 'Full SPM support' },
+  'FMDB':             { url: null, status: 'unavailable', note: 'Obj-C. Consider GRDB.swift or SQLite.swift for SPM.' },
+  'GRDB.swift':       { url: 'https://github.com/groue/GRDB.swift.git', status: 'available', note: 'Full SPM support' },
+  'SQLite.swift':     { url: 'https://github.com/nicklama/SQLite.swift.git', status: 'available', note: 'Full SPM support' },
+
+  // Reactive
+  'RxSwift':          { url: 'https://github.com/ReactiveX/RxSwift.git', status: 'available', note: 'Full SPM support. Products: RxSwift, RxCocoa, RxRelay, RxTest, RxBlocking' },
+  'RxCocoa':          { url: 'https://github.com/ReactiveX/RxSwift.git', status: 'available', note: 'Part of RxSwift package' },
+  'RxRelay':          { url: 'https://github.com/ReactiveX/RxSwift.git', status: 'available', note: 'Part of RxSwift package' },
+  'RxDataSources':    { url: 'https://github.com/RxSwiftCommunity/RxDataSources.git', status: 'available', note: 'SPM support available' },
+  'ReactiveSwift':    { url: 'https://github.com/ReactiveCocoa/ReactiveSwift.git', status: 'available', note: 'SPM support available' },
+  'ReactiveCocoa':    { url: 'https://github.com/ReactiveCocoa/ReactiveCocoa.git', status: 'available', note: 'SPM support available' },
+  'Combine':          { url: null, status: 'available', note: 'Built into Apple frameworks — no package needed' },
+
+  // Firebase
+  'Firebase':              { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'SPM support since 8.0. Use firebase-ios-sdk.' },
+  'Firebase/Core':         { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'Use FirebaseAnalytics product from firebase-ios-sdk' },
+  'Firebase/Analytics':    { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'Use FirebaseAnalytics product' },
+  'Firebase/Auth':         { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'Use FirebaseAuth product' },
+  'Firebase/Firestore':    { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'Use FirebaseFirestore product' },
+  'Firebase/Messaging':    { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'Use FirebaseMessaging product' },
+  'Firebase/Storage':      { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'Use FirebaseStorage product' },
+  'Firebase/Crashlytics':  { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'Use FirebaseCrashlytics product. Requires build phase script.' },
+  'Firebase/RemoteConfig': { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'Use FirebaseRemoteConfig product' },
+  'Firebase/Database':     { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'Use FirebaseDatabase product' },
+  'FirebaseAnalytics':     { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'Product from firebase-ios-sdk' },
+
+  // Google
+  'GoogleMaps':       { url: null, status: 'unavailable', note: 'Use Google Maps XCFramework. No native SPM yet.' },
+  'GooglePlaces':     { url: null, status: 'unavailable', note: 'Use XCFramework distribution.' },
+  'Google-Mobile-Ads-SDK': { url: 'https://github.com/nicklama/swift-package-manager-google-mobile-ads.git', status: 'likely', note: 'Community SPM wrapper. Check Google\'s latest docs.' },
+  'GoogleSignIn':     { url: 'https://github.com/nicklama/GoogleSignIn-iOS.git', status: 'available', note: 'SPM support available' },
+
+  // Analytics & Monitoring
+  'Fabric':           { url: null, status: 'unavailable', note: 'Deprecated. Use Firebase Crashlytics.' },
+  'Crashlytics':      { url: 'https://github.com/firebase/firebase-ios-sdk.git', status: 'available', note: 'Now FirebaseCrashlytics in firebase-ios-sdk' },
+  'Sentry':           { url: 'https://github.com/getsentry/sentry-cocoa.git', status: 'available', note: 'Full SPM support' },
+  'NewRelic':         { url: null, status: 'likely', note: 'Check NewRelic docs for latest SPM support' },
+  'Mixpanel-swift':   { url: 'https://github.com/mixpanel/mixpanel-swift.git', status: 'available', note: 'SPM support available' },
+  'Amplitude':        { url: 'https://github.com/amplitude/Amplitude-Swift.git', status: 'available', note: 'SPM support (use Amplitude-Swift)' },
+
+  // Auth
+  'AppAuth':          { url: 'https://github.com/openid/AppAuth-iOS.git', status: 'available', note: 'SPM support available' },
+  'OAuthSwift':       { url: 'https://github.com/OAuthSwift/OAuthSwift.git', status: 'available', note: 'SPM support available' },
+
+  // Testing
+  'Quick':            { url: 'https://github.com/Quick/Quick.git', status: 'available', note: 'Full SPM support' },
+  'Nimble':           { url: 'https://github.com/Quick/Nimble.git', status: 'available', note: 'Full SPM support' },
+  'OHHTTPStubs':      { url: null, status: 'unavailable', note: 'Obj-C. Use OHHTTPStubs/Swift or Mocker for SPM.' },
+  'Mocker':           { url: 'https://github.com/WeTransfer/Mocker.git', status: 'available', note: 'SPM-native. Good replacement for OHHTTPStubs.' },
+  'SnapshotTesting':  { url: 'https://github.com/pointfreeco/swift-snapshot-testing.git', status: 'available', note: 'SPM-native (swift-snapshot-testing)' },
+
+  // Utilities
+  'SwiftLint':        { url: 'https://github.com/realm/SwiftLint.git', status: 'available', note: 'Use as build tool plugin via SPM' },
+  'R.swift':          { url: 'https://github.com/nicklama/R.swift.git', status: 'available', note: 'SPM plugin support since 7.0' },
+  'SwiftGen':         { url: 'https://github.com/SwiftGen/SwiftGen.git', status: 'likely', note: 'SPM plugin. Check SwiftGen docs for setup.' },
+  'CryptoSwift':      { url: 'https://github.com/nicklama/CryptoSwift.git', status: 'available', note: 'Full SPM support' },
+  'SwiftDate':        { url: 'https://github.com/malcommac/SwiftDate.git', status: 'available', note: 'SPM support available' },
+  'Then':             { url: 'https://github.com/devxoul/Then.git', status: 'available', note: 'SPM support available' },
+  'SwifterSwift':     { url: 'https://github.com/SwifterSwift/SwifterSwift.git', status: 'available', note: 'Full SPM support' },
+  'DeviceKit':        { url: 'https://github.com/devicekit/DeviceKit.git', status: 'available', note: 'SPM support available' },
+  'Reachability.swift': { url: 'https://github.com/ashleymills/Reachability.swift.git', status: 'available', note: 'SPM support available. Also see NWPathMonitor (built-in).' },
+  'PromiseKit':       { url: 'https://github.com/mxcl/PromiseKit.git', status: 'available', note: 'SPM support. Consider async/await migration.' },
+  'Swinject':         { url: 'https://github.com/Swinject/Swinject.git', status: 'available', note: 'Full SPM support' },
+  'CocoaLumberjack':  { url: 'https://github.com/CocoaLumberjack/CocoaLumberjack.git', status: 'available', note: 'SPM support. Use CocoaLumberjackSwift product.' },
+  'SwiftProtobuf':    { url: 'https://github.com/nicklama/swift-protobuf.git', status: 'available', note: 'SPM-native (apple/swift-protobuf)' },
+  'GRPC':             { url: 'https://github.com/grpc/grpc-swift.git', status: 'available', note: 'SPM-native (grpc-swift)' },
+  'Zip':              { url: 'https://github.com/nicklama/Zip.git', status: 'available', note: 'SPM support available' },
+};
+
+// Podfile parser
+function parsePodfile(text) {
+  const lines = text.split('\n');
+  const pods = [];
+  let currentTarget = null;
+  let platform = null;
+  let platformVersion = null;
+  let useFrameworks = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Platform
+    const platformMatch = trimmed.match(/^platform\s+:(\w+),\s*['"]?([\d.]+)['"]?/);
+    if (platformMatch) {
+      platform = platformMatch[1];
+      platformVersion = platformMatch[2];
+      continue;
+    }
+
+    // use_frameworks!
+    if (trimmed === 'use_frameworks!') {
+      useFrameworks = true;
+      continue;
+    }
+
+    // Target
+    const targetMatch = trimmed.match(/^target\s+['"](.+?)['"]\s+do/);
+    if (targetMatch) {
+      currentTarget = targetMatch[1];
+      continue;
+    }
+
+    // Pod
+    const podMatch = trimmed.match(/^\s*pod\s+['"]([^'"]+)['"]\s*(?:,\s*['"]([^'"]*?)['"])?/);
+    if (podMatch) {
+      const name = podMatch[1];
+      const version = podMatch[2] || null;
+
+      // Check for subspecs (e.g., Firebase/Auth)
+      const baseName = name.split('/')[0];
+
+      pods.push({
+        name,
+        baseName,
+        version,
+        target: currentTarget,
+        isSubspec: name.includes('/')
+      });
+    }
+  }
+
+  return { pods, platform, platformVersion, useFrameworks };
+}
+
+// Analyze pods and get SPM info
+function analyzePods(pods) {
+  return pods.map(pod => {
+    const dbKey = pod.name;
+    const baseKey = pod.baseName;
+    const info = SPM_DATABASE[dbKey] || SPM_DATABASE[baseKey];
+
+    if (info) {
+      return {
+        ...pod,
+        spmUrl: info.url,
+        status: info.status,
+        note: info.note
+      };
+    }
+
+    return {
+      ...pod,
+      spmUrl: null,
+      status: 'likely',
+      note: `Not in database. Check GitHub for "${pod.baseName}" — many pods support SPM now.`
+    };
+  });
+}
+
+// Generate Package.swift
+function generatePackageSwift(analysis, platform, platformVersion) {
+  const platformStr = platform || 'iOS';
+  const versionStr = platformVersion || '15.0';
+
+  // Deduplicate by URL
+  const seen = new Map();
+  const deps = [];
+
+  for (const pod of analysis) {
+    if (!pod.spmUrl) continue;
+    if (seen.has(pod.spmUrl)) continue;
+    seen.set(pod.spmUrl, true);
+
+    // Extract package name from URL
+    const urlParts = pod.spmUrl.replace('.git', '').split('/');
+    const pkgName = urlParts[urlParts.length - 1];
+
+    deps.push({
+      name: pkgName,
+      url: pod.spmUrl,
+      podName: pod.baseName,
+      version: pod.version
+    });
+  }
+
+  let swift = `// swift-tools-version: 5.9\n`;
+  swift += `// Generated by CocoaPods → SPM Migration GUI\n\n`;
+  swift += `import PackageDescription\n\n`;
+  swift += `let package = Package(\n`;
+  swift += `    name: "MyApp",\n`;
+
+  // Platform
+  const platMap = { ios: '.iOS', macos: '.macOS', tvos: '.tvOS', watchos: '.watchOS' };
+  const platEnum = platMap[platformStr.toLowerCase()] || '.iOS';
+  swift += `    platforms: [\n`;
+  swift += `        ${platEnum}(.v${versionStr.replace(/\./g, '_').replace(/_0$/, '')})\n`;
+
+  // Handle version format - just use the string directly for simplicity
+  swift = swift.replace(/\.v[\w]+\)/, ''); // remove partial
+  const majorMinor = versionStr.split('.');
+  const vMajor = majorMinor[0];
+  const vMinor = majorMinor[1] || '0';
+  swift = `// swift-tools-version: 5.9\n`;
+  swift += `// Generated by CocoaPods → SPM Migration GUI\n\n`;
+  swift += `import PackageDescription\n\n`;
+  swift += `let package = Package(\n`;
+  swift += `    name: "MyApp",\n`;
+  swift += `    platforms: [\n`;
+  swift += `        ${platEnum}("${versionStr}")\n`;
+  swift += `    ],\n`;
+
+  // Dependencies
+  swift += `    dependencies: [\n`;
+  deps.forEach((dep, i) => {
+    const comma = i < deps.length - 1 ? ',' : '';
+    if (dep.version) {
+      const cleanVersion = dep.version.replace(/^~>\s*/, '').replace(/^>=\s*/, '').replace(/^=\s*/, '');
+      swift += `        .package(url: "${dep.url}", from: "${cleanVersion}")${comma}\n`;
+    } else {
+      swift += `        .package(url: "${dep.url}", from: "1.0.0")${comma}\n`;
+    }
+  });
+  swift += `    ],\n`;
+
+  // Targets
+  swift += `    targets: [\n`;
+  swift += `        .target(\n`;
+  swift += `            name: "MyApp",\n`;
+  swift += `            dependencies: [\n`;
+
+  const products = [];
+  for (const dep of deps) {
+    const urlParts = dep.url.replace('.git', '').split('/');
+    const pkgName = urlParts[urlParts.length - 1];
+    products.push(`                .product(name: "${dep.podName}", package: "${pkgName}")`);
+  }
+  swift += products.join(',\n') + '\n';
+
+  swift += `            ]\n`;
+  swift += `        ),\n`;
+  swift += `        .testTarget(\n`;
+  swift += `            name: "MyAppTests",\n`;
+  swift += `            dependencies: ["MyApp"]\n`;
+  swift += `        )\n`;
+  swift += `    ]\n`;
+  swift += `)\n`;
+
+  return swift;
+}
+
+// Syntax highlight Package.swift
+function highlightSwift(code) {
+  return code
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/(\/\/[^\n]*)/g, '<span class="cm">$1</span>')
+    .replace(/\b(import|let|name|platforms|dependencies|targets)\b/g, '<span class="kw">$1</span>')
+    .replace(/(\.\w+)\(/g, '<span class="fn">$1</span>(')
+    .replace(/"([^"]*)"/g, '"<span class="str">$1</span>"');
+}
+
+// Main analysis
+function analyze() {
+  const input = document.getElementById('podfile-input').value.trim();
+  if (!input) {
+    showToast('Paste a Podfile first');
+    return;
+  }
+
+  const { pods, platform, platformVersion, useFrameworks } = parsePodfile(input);
+  if (pods.length === 0) {
+    showToast('No pods found. Check Podfile format.');
+    return;
+  }
+
+  const analysis = analyzePods(pods);
+
+  // Stats
+  const available = analysis.filter(p => p.status === 'available').length;
+  const likely = analysis.filter(p => p.status === 'likely').length;
+  const unavailable = analysis.filter(p => p.status === 'unavailable').length;
+  const total = analysis.length;
+
+  // Stats bar
+  document.getElementById('stats-bar').innerHTML = `
+    <div class="stat"><span class="stat-dot green"></span> ${available} SPM Ready</div>
+    <div class="stat"><span class="stat-dot yellow"></span> ${likely} Check Needed</div>
+    <div class="stat"><span class="stat-dot red"></span> ${unavailable} Manual Migration</div>
+    <div class="stat" style="color:var(--gold)">${total} total pods</div>
+  `;
+
+  // Progress bar
+  document.getElementById('progress-bar').innerHTML = `
+    <div class="progress-segment green" style="width:${(available/total)*100}%"></div>
+    <div class="progress-segment yellow" style="width:${(likely/total)*100}%"></div>
+    <div class="progress-segment red" style="width:${(unavailable/total)*100}%"></div>
+  `;
+
+  // Dependency cards
+  const sorted = [...analysis].sort((a, b) => {
+    const order = { available: 0, likely: 1, unavailable: 2 };
+    return order[a.status] - order[b.status];
+  });
+
+  document.getElementById('dep-list').innerHTML = sorted.map(dep => {
+    const tagLabel = dep.status === 'available' ? 'SPM Ready' : dep.status === 'likely' ? 'Check' : 'Manual';
+    const spmLine = dep.spmUrl ? `<br>SPM: <code>${dep.spmUrl}</code>` : '';
+    const versionLine = dep.version ? ` <span class="dep-version">${dep.version}</span>` : '';
+
+    return `
+      <div class="dep-card" onclick="this.classList.toggle('expanded')">
+        <div class="dep-status ${dep.status}"></div>
+        <div>
+          <span class="dep-name">${escapeHtml(dep.name)}</span>${versionLine}
+          ${dep.target ? `<span class="dep-version" style="margin-left:0.5rem">→ ${escapeHtml(dep.target)}</span>` : ''}
+        </div>
+        <span class="dep-tag ${dep.status}">${tagLabel}</span>
+        <span class="chevron">▶</span>
+        <div class="dep-details">
+          ${escapeHtml(dep.note)}${spmLine}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Migration notes
+  const notes = [];
+  if (unavailable > 0) {
+    notes.push('Some pods have no SPM equivalent — manual alternatives listed in each card');
+  }
+  notes.push('Remove your Podfile, Podfile.lock, and .xcworkspace after migrating');
+  notes.push('Open the .xcodeproj (not .xcworkspace) and add packages via File → Add Package Dependencies');
+  notes.push('Or add this Package.swift to your project root for package-based dependency management');
+  if (analysis.some(p => p.name.startsWith('Firebase'))) {
+    notes.push('Firebase: add the firebase-ios-sdk package once, then select individual products (FirebaseAuth, FirebaseFirestore, etc.)');
+  }
+  if (analysis.some(p => ['RxCocoa', 'RxRelay', 'RxSwift'].includes(p.name))) {
+    notes.push('RxSwift: add the RxSwift package once, then select products (RxSwift, RxCocoa, RxRelay) per target');
+  }
+  notes.push('Run your tests after migration to catch any import or naming differences');
+
+  const notesList = document.getElementById('migration-steps');
+  notesList.innerHTML = notes.map(n => `<li>${n}</li>`).join('');
+  document.getElementById('migration-notes').style.display = 'block';
+
+  // Generate Package.swift
+  const packageSwift = generatePackageSwift(analysis, platform, platformVersion);
+  document.getElementById('package-output').innerHTML = highlightSwift(packageSwift);
+
+  // Store raw for copy/download
+  window._packageSwiftRaw = packageSwift;
+
+  // Show results
+  document.getElementById('results').classList.add('visible');
+
+  showToast(`Analyzed ${total} pods — ${available} ready for SPM`);
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function copyOutput() {
+  if (!window._packageSwiftRaw) {
+    showToast('Generate a Package.swift first');
+    return;
+  }
+  navigator.clipboard.writeText(window._packageSwiftRaw).then(() => {
+    showToast('Copied to clipboard');
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = window._packageSwiftRaw;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Copied to clipboard');
+  });
+}
+
+function downloadPackageSwift() {
+  if (!window._packageSwiftRaw) {
+    showToast('Generate a Package.swift first');
+    return;
+  }
+  const blob = new Blob([window._packageSwiftRaw], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Package.swift';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Downloaded Package.swift');
+}
+
+function clearAll() {
+  document.getElementById('podfile-input').value = '';
+  document.getElementById('package-output').innerHTML = '<span class="cm">// Paste a Podfile to generate your Package.swift</span>';
+  document.getElementById('results').classList.remove('visible');
+  window._packageSwiftRaw = null;
+}
+
+function loadSample() {
+  document.getElementById('podfile-input').value = `platform :ios, '16.0'
+
+target 'MyApp' do
+  use_frameworks!
+
+  # Networking
+  pod 'Alamofire', '~> 5.9'
+  pod 'Moya', '~> 15.0'
+
+  # UI
+  pod 'SnapKit', '~> 5.7'
+  pod 'SDWebImage', '~> 5.19'
+  pod 'Kingfisher', '~> 7.12'
+  pod 'lottie-ios', '~> 4.4'
+  pod 'SkeletonView', '~> 1.31'
+  pod 'Hero', '~> 1.6'
+
+  # Firebase
+  pod 'Firebase/Analytics'
+  pod 'Firebase/Auth'
+  pod 'Firebase/Firestore'
+  pod 'Firebase/Crashlytics'
+  pod 'Firebase/Messaging'
+
+  # Reactive
+  pod 'RxSwift', '~> 6.7'
+  pod 'RxCocoa', '~> 6.7'
+
+  # Data
+  pod 'SwiftyJSON', '~> 5.0'
+  pod 'RealmSwift', '~> 10.50'
+  pod 'KeychainAccess', '~> 4.2'
+
+  # Utilities
+  pod 'SwiftLint'
+  pod 'CryptoSwift', '~> 1.8'
+  pod 'DeviceKit', '~> 5.4'
+  pod 'IQKeyboardManagerSwift', '~> 7.0'
+
+  # Legacy — no SPM
+  pod 'AFNetworking', '~> 4.0'
+  pod 'GoogleMaps'
+
+  target 'MyAppTests' do
+    inherit! :search_paths
+    pod 'Quick', '~> 7.6'
+    pod 'Nimble', '~> 13.0'
+  end
+end`;
+  showToast('Sample Podfile loaded');
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// Auto-analyze on paste
+document.getElementById('podfile-input').addEventListener('paste', () => {
+  setTimeout(analyze, 100);
+});
+</script>
+</body>
+</html>
